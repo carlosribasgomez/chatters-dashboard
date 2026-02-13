@@ -2610,7 +2610,7 @@
     {
       "name": "Paula Martin",
       "group": "Equipo 2",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.19,
       "total_earnings": 772.0,
       "message_revenue": 632.8,
@@ -3744,7 +3744,7 @@
     {
       "name": "Laura Soler",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.21,
       "total_earnings": 637.67,
       "message_revenue": 521.67,
@@ -5432,7 +5432,7 @@
     {
       "name": "Lara",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.12,
       "total_earnings": 264.8,
       "message_revenue": 214.4,
@@ -6112,7 +6112,7 @@
     {
       "name": "Alba Marin",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.09,
       "total_earnings": 243.99,
       "message_revenue": 123.99,
@@ -6672,7 +6672,7 @@
     {
       "name": "Dari Urdaneta",
       "group": "Equipo 2",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.32,
       "total_earnings": 217.56,
       "message_revenue": 96.0,
@@ -9939,7 +9939,7 @@
     {
       "name": "Andrea",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.05,
       "total_earnings": 137.6,
       "message_revenue": 113.6,
@@ -11718,7 +11718,7 @@
     {
       "name": "Lucia Roldan",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.03,
       "total_earnings": 81.6,
       "message_revenue": 33.6,
@@ -12909,7 +12909,7 @@
     {
       "name": "Nora Carusso",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.01,
       "total_earnings": 24.96,
       "message_revenue": 19.2,
@@ -13174,7 +13174,7 @@
     {
       "name": "Perla Daniela",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.03,
       "total_earnings": 14.6,
       "message_revenue": 12.0,
@@ -13502,7 +13502,7 @@
     {
       "name": "Alina Blonde",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.01,
       "total_earnings": 14.39,
       "message_revenue": 10.4,
@@ -14520,7 +14520,7 @@
     {
       "name": "Alicia Daniela(delete)",
       "group": "",
-      "account_type": "paid",
+      "account_type": "unknown",
       "ltv": 0,
       "total_earnings": 0.0,
       "message_revenue": 0.0,
@@ -14689,7 +14689,7 @@
     {
       "name": "Lea",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.0,
       "total_earnings": 0.0,
       "message_revenue": 0.0,
@@ -14875,7 +14875,7 @@
     {
       "name": "Lunala drn",
       "group": "Equipo 3",
-      "account_type": "paid",
+      "account_type": "mixta",
       "ltv": 0.0,
       "total_earnings": 0.0,
       "message_revenue": 0.0,

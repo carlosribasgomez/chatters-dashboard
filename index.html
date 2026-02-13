@@ -357,12 +357,14 @@ function renderModels() {
   const el = $('tab-models');
   const freeCount = D.models.filter(m=>m.account_type==='free').length;
   const paidCount = D.models.filter(m=>m.account_type==='paid').length;
+  const mixtaCount = D.models.filter(m=>m.account_type==='mixta').length;
   el.innerHTML = `
     <div class="section-title">Analisis por Modelo <span class="count" id="modFilterCount">${D.models.length} modelos</span></div>
-    <div style="display:flex;gap:6px;margin-bottom:16px">
+    <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
       <button class="nav-tab model-filter-btn active" onclick="setModelFilter('all',this)" style="padding:7px 16px;font-size:12px">Todos (${D.models.length})</button>
       <button class="nav-tab model-filter-btn" onclick="setModelFilter('free',this)" style="padding:7px 16px;font-size:12px;border:1px solid rgba(52,211,153,.3)">Free (${freeCount})</button>
       <button class="nav-tab model-filter-btn" onclick="setModelFilter('paid',this)" style="padding:7px 16px;font-size:12px;border:1px solid rgba(167,139,250,.3)">Paid (${paidCount})</button>
+      <button class="nav-tab model-filter-btn" onclick="setModelFilter('mixta',this)" style="padding:7px 16px;font-size:12px;border:1px solid rgba(251,191,36,.3)">Mixtas (${mixtaCount})</button>
     </div>
     <div class="table-card">
       <div class="table-header"><h3>Modelos</h3><input class="search-input" placeholder="Buscar modelo..." oninput="filterTbl('modTbl',this.value)"></div>
@@ -392,7 +394,7 @@ function renderModels() {
       </div>
     </div>
   `;
-  const typeBadge = (t) => t==='free'?'<span class="pill" style="background:rgba(52,211,153,.15);color:var(--accent-green)">Free</span>':t==='paid'?'<span class="pill" style="background:rgba(167,139,250,.15);color:var(--accent-purple)">Paid</span>':'<span class="pill warn">?</span>';
+  const typeBadge = (t) => t==='free'?'<span class="pill" style="background:rgba(52,211,153,.15);color:var(--accent-green)">Free</span>':t==='paid'?'<span class="pill" style="background:rgba(167,139,250,.15);color:var(--accent-purple)">Paid</span>':t==='mixta'?'<span class="pill" style="background:rgba(251,191,36,.15);color:#fbbf24">Mixta</span>':'<span class="pill warn">?</span>';
   $('modTblBody').innerHTML = D.models.map((m,i) => `<tr data-type="${m.account_type}">
     <td data-sort="${i}">${rb(i)}</td>
     <td><a class="clickable" onclick="openModel('${esc(m.name)}')">${m.name}</a></td>
@@ -502,7 +504,7 @@ function renderHourly() {
 function openModel(name) {
   const m = D.models.find(x=>x.name===name); if(!m) return;
   const mid = 'md_'+Date.now();
-  const tBadge = m.account_type==='free'?'<span class="pill" style="background:rgba(52,211,153,.15);color:var(--accent-green);font-size:12px;padding:4px 12px">FREE</span>':'<span class="pill" style="background:rgba(167,139,250,.15);color:var(--accent-purple);font-size:12px;padding:4px 12px">PAID</span>';
+  const tBadge = m.account_type==='free'?'<span class="pill" style="background:rgba(52,211,153,.15);color:var(--accent-green);font-size:12px;padding:4px 12px">FREE</span>':m.account_type==='mixta'?'<span class="pill" style="background:rgba(251,191,36,.15);color:#fbbf24;font-size:12px;padding:4px 12px">MIXTA</span>':'<span class="pill" style="background:rgba(167,139,250,.15);color:var(--accent-purple);font-size:12px;padding:4px 12px">PAID</span>';
   let html = `
     <div class="modal-header"><h2>${m.name} ${tBadge}</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
     <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">

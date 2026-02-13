@@ -1090,19 +1090,19 @@
 
       tbody.innerHTML = DATA.models.map((m, i) => `
         <tr>
-          <td>${getRankBadge(i)}</td>
+          <td data-sort="${i}">${getRankBadge(i)}</td>
           <td><a class="clickable" onclick="openModelDetail('${m.name.replace(/'/g, "\\'")}')">${m.name}</a></td>
-          <td class="num">${m.total_messages.toLocaleString()}</td>
-          <td class="num">${m.fans.toLocaleString()}</td>
-          <td class="num">${m.ppv_sent}</td>
-          <td class="num">${m.ppv_purchased}</td>
-          <td class="num" style="color:var(--accent-green);font-weight:600">$${m.revenue.toLocaleString()}</td>
-          <td class="num">${getGRPill(m.golden_ratio)}</td>
-          <td class="num">${getURPill(m.unlock_ratio)}</td>
-          <td>${m.avg_replay_formatted} ${getResponsePill(m.avg_replay_seconds)}</td>
+          <td class="num" data-sort="${m.total_messages}">${m.total_messages.toLocaleString()}</td>
+          <td class="num" data-sort="${m.fans}">${m.fans.toLocaleString()}</td>
+          <td class="num" data-sort="${m.ppv_sent}">${m.ppv_sent}</td>
+          <td class="num" data-sort="${m.ppv_purchased}">${m.ppv_purchased}</td>
+          <td class="num" data-sort="${m.revenue}" style="color:var(--accent-green);font-weight:600">$${m.revenue.toLocaleString()}</td>
+          <td class="num" data-sort="${m.golden_ratio}">${getGRPill(m.golden_ratio)}</td>
+          <td class="num" data-sort="${m.unlock_ratio}">${getURPill(m.unlock_ratio)}</td>
+          <td data-sort="${m.avg_replay_seconds}">${m.avg_replay_formatted} ${getResponsePill(m.avg_replay_seconds)}</td>
           <td><span class="badge">${m.peak_traffic_hour}</span></td>
           <td><span class="badge">${m.peak_sales_hour}</span></td>
-          <td class="num">${m.chatters_count}</td>
+          <td class="num" data-sort="${m.chatters_count}">${m.chatters_count}</td>
         </tr>
       `).join('');
     }
@@ -1117,19 +1117,19 @@
         const fillColor = fastPct >= 70 ? 'var(--accent-green)' : fastPct >= 50 ? 'var(--accent-yellow)' : 'var(--accent-red)';
         return `
         <tr>
-          <td>${getRankBadge(i)}</td>
+          <td data-sort="${i}">${getRankBadge(i)}</td>
           <td><a class="clickable" onclick="openChatterDetail('${c.name.replace(/'/g, "\\'")}')">${c.name}</a></td>
-          <td class="num">${c.total_messages.toLocaleString()}</td>
-          <td class="num">${c.fans.toLocaleString()}</td>
-          <td class="num">${c.models_count}</td>
-          <td class="num">${c.ppv_sent}</td>
-          <td class="num">${c.ppv_purchased}</td>
-          <td class="num" style="color:var(--accent-green);font-weight:600">$${c.revenue.toLocaleString()}</td>
-          <td class="num">${getGRPill(c.golden_ratio)}</td>
-          <td class="num">${getURPill(c.unlock_ratio)}</td>
-          <td>${c.avg_replay_formatted}</td>
-          <td>${c.median_replay_formatted}</td>
-          <td>
+          <td class="num" data-sort="${c.total_messages}">${c.total_messages.toLocaleString()}</td>
+          <td class="num" data-sort="${c.fans}">${c.fans.toLocaleString()}</td>
+          <td class="num" data-sort="${c.models_count}">${c.models_count}</td>
+          <td class="num" data-sort="${c.ppv_sent}">${c.ppv_sent}</td>
+          <td class="num" data-sort="${c.ppv_purchased}">${c.ppv_purchased}</td>
+          <td class="num" data-sort="${c.revenue}" style="color:var(--accent-green);font-weight:600">$${c.revenue.toLocaleString()}</td>
+          <td class="num" data-sort="${c.golden_ratio}">${getGRPill(c.golden_ratio)}</td>
+          <td class="num" data-sort="${c.unlock_ratio}">${getURPill(c.unlock_ratio)}</td>
+          <td data-sort="${c.avg_replay_seconds}">${c.avg_replay_formatted}</td>
+          <td data-sort="${c.median_replay_seconds}">${c.median_replay_formatted}</td>
+          <td data-sort="${fastPct}">
             ${fastPct}%
             <div class="progress-bar"><div class="progress-fill" style="width:${fastPct}%;background:${fillColor}"></div></div>
           </td>
@@ -1453,13 +1453,15 @@
       table.querySelectorAll('th')[colIdx].classList.add('sorted');
 
       rows.sort((a, b) => {
-        let va = a.cells[colIdx].textContent.trim();
-        let vb = b.cells[colIdx].textContent.trim();
+        const cellA = a.cells[colIdx];
+        const cellB = b.cells[colIdx];
         if (type === 'num') {
-          va = parseFloat(va.replace(/[$,%]/g, '')) || 0;
-          vb = parseFloat(vb.replace(/[$,%]/g, '')) || 0;
+          const va = cellA.hasAttribute('data-sort') ? parseFloat(cellA.getAttribute('data-sort')) || 0 : parseFloat(cellA.textContent.replace(/[$,%\s]/g, '')) || 0;
+          const vb = cellB.hasAttribute('data-sort') ? parseFloat(cellB.getAttribute('data-sort')) || 0 : parseFloat(cellB.textContent.replace(/[$,%\s]/g, '')) || 0;
           return asc ? va - vb : vb - va;
         }
+        const va = cellA.hasAttribute('data-sort') ? cellA.getAttribute('data-sort') : cellA.textContent.trim();
+        const vb = cellB.hasAttribute('data-sort') ? cellB.getAttribute('data-sort') : cellB.textContent.trim();
         return asc ? va.localeCompare(vb) : vb.localeCompare(va);
       });
 

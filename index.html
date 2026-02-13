@@ -33,7 +33,7 @@
     .container { max-width: 1600px; margin: 0 auto; padding: 20px 28px; }
 
     /* Nav */
-    .nav-tabs { display: flex; gap: 4px; background: var(--bg-secondary); border-radius: 12px; padding: 4px; margin-bottom: 20px; overflow-x: auto; align-items: center; }
+    .nav-tabs { display: flex; gap: 4px; background: var(--bg-secondary); border-radius: 12px; padding: 4px; margin-bottom: 20px; overflow: visible; align-items: center; }
     .nav-tab { padding: 9px 18px; border-radius: 8px; border: none; background: transparent; color: var(--text-secondary); font-size: 13px; font-weight: 500; cursor: pointer; transition: all .2s; white-space: nowrap; }
     .nav-tab:hover { background: var(--bg-hover); color: var(--text-primary); }
     .nav-tab.active { background: var(--accent-blue); color: #fff; }
@@ -579,7 +579,7 @@ function toggleDropdown(e) {
   const dd = e.target.closest('.dropdown');
   dd.classList.toggle('open');
 }
-document.addEventListener('click',()=>document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open')));
+document.addEventListener('click',(e)=>{if(!e.target.closest('.dropdown'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));});
 
 function filterTbl(id, q) {
   const rows=$(id).querySelectorAll('tbody tr');

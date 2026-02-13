@@ -213,9 +213,31 @@ function rb(i) {
   if(i===2) return '<span class="rank bronze">3</span>';
   return '<span class="rank n">'+(i+1)+'</span>';
 }
-function grPill(v) { return '<span class="pill '+(v>=5?'good':v>=3?'warn':'bad')+'">'+v+'%</span>'; }
+// Golden Ratio: 0-2.99 desastre | 3-4.99 flojo | 5-6.99 bien | 7-8.99 muy bien | 9+ agresivo
+function grPill(v) {
+  if(v>=9) return '<span class="pill" style="background:rgba(79,140,255,.2);color:var(--accent-blue)">'+v+'%</span>';
+  if(v>=7) return '<span class="pill good">'+v+'%</span>';
+  if(v>=5) return '<span class="pill" style="background:rgba(52,211,153,.12);color:#6ee7b7">'+v+'%</span>';
+  if(v>=3) return '<span class="pill warn">'+v+'%</span>';
+  return '<span class="pill bad">'+v+'%</span>';
+}
+function grLabel(v) {
+  if(v>=9) return 'Agresivo';
+  if(v>=7) return 'Muy Bien';
+  if(v>=5) return 'Bien';
+  if(v>=3) return 'Flojo';
+  return 'Desastre';
+}
 function urPill(v) { return '<span class="pill '+(v>=30?'good':v>=20?'warn':'bad')+'">'+v+'%</span>'; }
-function rtPill(s) { if(!s) return '<span class="pill warn">N/A</span>'; return '<span class="pill '+(s<=300?'good':s<=600?'warn':'bad')+'">'+(s<=300?'Rapido':s<=600?'Normal':'Lento')+'</span>'; }
+// Reply Time: 0-90s muy bueno | 90-120s bueno | 120-150s medio | 150-180s malo | 180s+ muy malo
+function rtPill(s) {
+  if(!s) return '<span class="pill warn">N/A</span>';
+  if(s<=90) return '<span class="pill good">Muy Rapido</span>';
+  if(s<=120) return '<span class="pill" style="background:rgba(52,211,153,.12);color:#6ee7b7">Rapido</span>';
+  if(s<=150) return '<span class="pill warn">Medio</span>';
+  if(s<=180) return '<span class="pill" style="background:rgba(251,146,60,.15);color:var(--accent-orange)">Lento</span>';
+  return '<span class="pill bad">Muy Lento</span>';
+}
 function fmtMoney(v) { return '$'+Number(v).toLocaleString('en-US',{minimumFractionDigits:2,maximumFractionDigits:2}); }
 function fmtNum(v) { return Number(v).toLocaleString('en-US'); }
 function esc(s) { return String(s).replace(/'/g,"\\'"); }
@@ -316,40 +338,67 @@ function renderShifts() {
 }
 
 // =============== MODELS ===============
+let modelFilter = 'all';
+function setModelFilter(type, btn) {
+  modelFilter = type;
+  document.querySelectorAll('.model-filter-btn').forEach(b=>b.classList.remove('active'));
+  btn.classList.add('active');
+  const rows = $('modTbl').querySelectorAll('tbody tr');
+  rows.forEach(r => {
+    if(type==='all') { r.style.display=''; return; }
+    r.style.display = r.getAttribute('data-type')===type ? '' : 'none';
+  });
+  // Update count
+  const visible = Array.from(rows).filter(r=>r.style.display!=='none').length;
+  $('modFilterCount').textContent = visible + ' modelos';
+}
+
 function renderModels() {
   const el = $('tab-models');
+  const freeCount = D.models.filter(m=>m.account_type==='free').length;
+  const paidCount = D.models.filter(m=>m.account_type==='paid').length;
   el.innerHTML = `
-    <div class="section-title">Analisis por Modelo <span class="count">${D.models.length} modelos</span></div>
+    <div class="section-title">Analisis por Modelo <span class="count" id="modFilterCount">${D.models.length} modelos</span></div>
+    <div style="display:flex;gap:6px;margin-bottom:16px">
+      <button class="nav-tab model-filter-btn active" onclick="setModelFilter('all',this)" style="padding:7px 16px;font-size:12px">Todos (${D.models.length})</button>
+      <button class="nav-tab model-filter-btn" onclick="setModelFilter('free',this)" style="padding:7px 16px;font-size:12px;border:1px solid rgba(52,211,153,.3)">Free (${freeCount})</button>
+      <button class="nav-tab model-filter-btn" onclick="setModelFilter('paid',this)" style="padding:7px 16px;font-size:12px;border:1px solid rgba(167,139,250,.3)">Paid (${paidCount})</button>
+    </div>
     <div class="table-card">
-      <div class="table-header"><h3>Todos los Modelos</h3><input class="search-input" placeholder="Buscar modelo..." oninput="filterTbl('modTbl',this.value)"></div>
+      <div class="table-header"><h3>Modelos</h3><input class="search-input" placeholder="Buscar modelo..." oninput="filterTbl('modTbl',this.value)"></div>
       <div class="table-scroll">
         <table class="data-table" id="modTbl"><thead><tr>
           <th onclick="sortTbl('modTbl',0,'n')">#</th>
           <th onclick="sortTbl('modTbl',1,'t')">Modelo</th>
-          <th onclick="sortTbl('modTbl',2,'n')" class="num">Total Earn.</th>
-          <th onclick="sortTbl('modTbl',3,'n')" class="num">Msg Rev.</th>
-          <th onclick="sortTbl('modTbl',4,'n')" class="num">New Subs</th>
-          <th onclick="sortTbl('modTbl',5,'n')" class="num">Rec Subs</th>
-          <th onclick="sortTbl('modTbl',6,'n')" class="num">Tips</th>
-          <th onclick="sortTbl('modTbl',7,'n')" class="num">New Fans</th>
-          <th onclick="sortTbl('modTbl',8,'n')" class="num">Active Fans</th>
-          <th onclick="sortTbl('modTbl',9,'t')">Avg Sub Len</th>
-          <th onclick="sortTbl('modTbl',10,'n')" class="num">PPV Env.</th>
-          <th onclick="sortTbl('modTbl',11,'n')" class="num">PPV Unl.</th>
-          <th onclick="sortTbl('modTbl',12,'n')" class="num">Golden R.</th>
-          <th onclick="sortTbl('modTbl',13,'n')" class="num">Unlock R.</th>
-          <th onclick="sortTbl('modTbl',14,'n')" class="num">Fan CVR</th>
-          <th onclick="sortTbl('modTbl',15,'t')">Resp.</th>
+          <th>Tipo</th>
+          <th onclick="sortTbl('modTbl',3,'n')" class="num">Total Earn.</th>
+          <th onclick="sortTbl('modTbl',4,'n')" class="num">LTV</th>
+          <th onclick="sortTbl('modTbl',5,'n')" class="num">Msg Rev.</th>
+          <th onclick="sortTbl('modTbl',6,'n')" class="num">New Subs</th>
+          <th onclick="sortTbl('modTbl',7,'n')" class="num">Rec Subs</th>
+          <th onclick="sortTbl('modTbl',8,'n')" class="num">Tips</th>
+          <th onclick="sortTbl('modTbl',9,'n')" class="num">New Fans</th>
+          <th onclick="sortTbl('modTbl',10,'n')" class="num">Active Fans</th>
+          <th onclick="sortTbl('modTbl',11,'t')">Avg Sub Len</th>
+          <th onclick="sortTbl('modTbl',12,'n')" class="num">PPV Env.</th>
+          <th onclick="sortTbl('modTbl',13,'n')" class="num">PPV Unl.</th>
+          <th onclick="sortTbl('modTbl',14,'n')" class="num">Golden R.</th>
+          <th onclick="sortTbl('modTbl',15,'n')" class="num">Unlock R.</th>
+          <th onclick="sortTbl('modTbl',16,'n')" class="num">Fan CVR</th>
+          <th onclick="sortTbl('modTbl',17,'t')">Resp.</th>
           <th>Peak Traf.</th>
           <th>Peak Vtas.</th>
         </tr></thead><tbody id="modTblBody"></tbody></table>
       </div>
     </div>
   `;
-  $('modTblBody').innerHTML = D.models.map((m,i) => `<tr>
+  const typeBadge = (t) => t==='free'?'<span class="pill" style="background:rgba(52,211,153,.15);color:var(--accent-green)">Free</span>':t==='paid'?'<span class="pill" style="background:rgba(167,139,250,.15);color:var(--accent-purple)">Paid</span>':'<span class="pill warn">?</span>';
+  $('modTblBody').innerHTML = D.models.map((m,i) => `<tr data-type="${m.account_type}">
     <td data-sort="${i}">${rb(i)}</td>
     <td><a class="clickable" onclick="openModel('${esc(m.name)}')">${m.name}</a></td>
+    <td>${typeBadge(m.account_type)}</td>
     <td class="num" data-sort="${m.total_earnings}" style="color:var(--accent-green);font-weight:600">${fmtMoney(m.total_earnings)}</td>
+    <td class="num" data-sort="${m.ltv}" style="color:var(--accent-cyan);font-weight:600">${fmtMoney(m.ltv)}</td>
     <td class="num" data-sort="${m.message_revenue}">${fmtMoney(m.message_revenue)}</td>
     <td class="num" data-sort="${m.new_subs_revenue}" style="color:var(--accent-cyan)">${fmtMoney(m.new_subs_revenue)}</td>
     <td class="num" data-sort="${m.recurring_subs_revenue}">${fmtMoney(m.recurring_subs_revenue)}</td>
@@ -453,10 +502,12 @@ function renderHourly() {
 function openModel(name) {
   const m = D.models.find(x=>x.name===name); if(!m) return;
   const mid = 'md_'+Date.now();
+  const tBadge = m.account_type==='free'?'<span class="pill" style="background:rgba(52,211,153,.15);color:var(--accent-green);font-size:12px;padding:4px 12px">FREE</span>':'<span class="pill" style="background:rgba(167,139,250,.15);color:var(--accent-purple);font-size:12px;padding:4px 12px">PAID</span>';
   let html = `
-    <div class="modal-header"><h2>${m.name}</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
+    <div class="modal-header"><h2>${m.name} ${tBadge}</h2><button class="modal-close" onclick="closeModal()">&times;</button></div>
     <div class="kpi-grid" style="grid-template-columns:repeat(auto-fit,minmax(140px,1fr))">
       <div class="kpi-card"><div class="kpi-label">Total Earnings</div><div class="kpi-value green">${fmtMoney(m.total_earnings)}</div></div>
+      <div class="kpi-card" style="border-color:var(--accent-cyan)"><div class="kpi-label">LTV (Earn/Fan)</div><div class="kpi-value cyan">${fmtMoney(m.ltv)}</div><div class="kpi-detail">Total earnings / fans activos</div></div>
       <div class="kpi-card"><div class="kpi-label">Msg Revenue</div><div class="kpi-value blue">${fmtMoney(m.message_revenue)}</div></div>
       <div class="kpi-card"><div class="kpi-label">New Subs</div><div class="kpi-value cyan">${fmtMoney(m.new_subs_revenue)}</div></div>
       <div class="kpi-card"><div class="kpi-label">Rec Subs</div><div class="kpi-value purple">${fmtMoney(m.recurring_subs_revenue)}</div></div>

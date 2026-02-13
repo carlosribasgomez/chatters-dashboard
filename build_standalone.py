@@ -6,6 +6,7 @@ Genera un HTML standalone con los datos embebidos para compartir.
 
 import json
 import os
+import re
 
 HTML_PATH = r'c:\Users\carlo\Carlos Ribas Cursor Projects\chatters-dashboard\index.html'
 JSON_PATH = r'c:\Users\carlo\Carlos Ribas Cursor Projects\chatters-dashboard\dashboard_data.json'
@@ -19,29 +20,24 @@ json_minified = json.dumps(data, ensure_ascii=False, separators=(',', ':'))
 with open(HTML_PATH, 'r', encoding='utf-8') as f:
     html = f.read()
 
-# New HTML uses: fetch('dashboard_data.json') with fallback to window.__EMBEDDED_DATA__
-# Replace the loadData function to use embedded data directly
-old_load = """async function loadData() {
-  try {
-    const r = await fetch('dashboard_data.json');
-    D = await r.json();
-  } catch(e) {
-    D = window.__EMBEDDED_DATA__;
-  }
-  if (!D) {
-    document.querySelector('.container').innerHTML = '<div style="padding:40px;text-align:center;color:var(--accent-red)">Error cargando datos</div>';
-    return;
-  }
-  render();
-}"""
+# Replace loadData() function regardless of its current content
+# Match: async function loadData() { ... render(); \n}
+pattern = r'async function loadData\(\)\s*\{.*?render\(\);\s*\}'
+replacement = "async function loadData() {\n  D = " + json_minified + ";\n  render();\n}"
 
-new_load = "async function loadData() {\n  D = " + json_minified + ";\n  render();\n}"
+new_html, count = re.subn(pattern, replacement, html, count=1, flags=re.DOTALL)
 
-html = html.replace(old_load, new_load)
+if count == 0:
+    print("ERROR: No se encontro la funcion loadData() en index.html")
+    exit(1)
 
 with open(OUTPUT_PATH, 'w', encoding='utf-8') as f:
-    f.write(html)
+    f.write(new_html)
 
 size_kb = os.path.getsize(OUTPUT_PATH) / 1024
 print("Archivo generado: %s" % OUTPUT_PATH)
 print("Tamano: %d KB" % size_kb)
+
+# Verify account_type is in the output
+at_count = new_html.count('account_type')
+print("Verificacion: 'account_type' aparece %d veces en el HTML" % at_count)

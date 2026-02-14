@@ -648,15 +648,21 @@ function renderChatters() {
           <th onclick="sortTbl('chatTbl',1,'t')">Chatter</th>
           <th onclick="sortTbl('chatTbl',2,'t')">Equipo</th>
           <th onclick="sortTbl('chatTbl',3,'n')" class="num">Ventas</th>
-          <th onclick="sortTbl('chatTbl',4,'n')" class="num">Msgs</th>
-          <th onclick="sortTbl('chatTbl',5,'n')" class="num">Modelos</th>
+          <th onclick="sortTbl('chatTbl',4,'n')" class="num">Modelos</th>
+          <th onclick="sortTbl('chatTbl',5,'n')" class="num">Msgs</th>
           <th onclick="sortTbl('chatTbl',6,'n')" class="num">PPV Env.</th>
-          <th onclick="sortTbl('chatTbl',7,'n')" class="num">PPV Unl.</th>
-          <th onclick="sortTbl('chatTbl',8,'n')" class="num">Golden R.</th>
+          <th onclick="sortTbl('chatTbl',7,'n')" class="num">Golden R.</th>
+          <th onclick="sortTbl('chatTbl',8,'n')" class="num">PPV Unl.</th>
           <th onclick="sortTbl('chatTbl',9,'n')" class="num">Unlock R.</th>
-          <th onclick="sortTbl('chatTbl',10,'n')" class="num">Fan CVR</th>
-          <th onclick="sortTbl('chatTbl',11,'n')" class="num">$/Hora</th>
-          <th onclick="sortTbl('chatTbl',12,'t')">Resp.</th>
+          <th onclick="sortTbl('chatTbl',10,'n')" class="num">Fans Chat.</th>
+          <th onclick="sortTbl('chatTbl',11,'n')" class="num">Fans Spent</th>
+          <th onclick="sortTbl('chatTbl',12,'n')" class="num">Fan CVR</th>
+          <th onclick="sortTbl('chatTbl',13,'n')" class="num">Avg $/Spndr</th>
+          <th onclick="sortTbl('chatTbl',14,'n')" class="num">Chars</th>
+          <th onclick="sortTbl('chatTbl',15,'t')">Resp.</th>
+          <th onclick="sortTbl('chatTbl',16,'n')" class="num">Clocked H.</th>
+          <th onclick="sortTbl('chatTbl',17,'n')" class="num">$/Hora</th>
+          <th onclick="sortTbl('chatTbl',18,'n')" class="num">Msgs/Hora</th>
           <th>Vel. Resp.</th>
         </tr></thead><tbody id="chatTblBody"></tbody></table>
       </div>
@@ -667,20 +673,29 @@ function renderChatters() {
     const tot = tb.under_2m+tb.btwn_2_5m+tb.btwn_5_10m+tb.over_10m;
     const fp = tot>0?Math.round((tb.under_2m+tb.btwn_2_5m)/tot*100):0;
     const fc = fp>=70?'var(--accent-green)':fp>=50?'var(--accent-yellow)':'var(--accent-red)';
+    const clockH = c.clocked_minutes>0?(c.clocked_minutes/60).toFixed(1):'N/A';
+    const mPerH = c.msgs_per_hour||0;
+    const avgES = c.avg_earn_per_spender||0;
     return `<tr>
       <td data-sort="${i}">${rb(i)}</td>
       <td><a class="clickable" onclick="openChatter('${esc(c.name)}')">${c.name}</a></td>
       <td>${c.group}</td>
       <td class="num" data-sort="${c.total_sales}" style="color:var(--accent-green);font-weight:600">${fmtMoney(c.total_sales)}</td>
-      <td class="num" data-sort="${c.total_messages}">${fmtNum(c.total_messages)}</td>
       <td class="num" data-sort="${c.models_count}">${c.models_count}</td>
-      <td class="num" data-sort="${c.ppv_sent}">${c.ppv_sent}</td>
-      <td class="num" data-sort="${c.ppv_unlocked}">${c.ppv_unlocked}</td>
+      <td class="num" data-sort="${c.total_messages}">${fmtNum(c.total_messages)}</td>
+      <td class="num" data-sort="${c.ppv_sent}">${fmtNum(c.ppv_sent)}</td>
       <td class="num" data-sort="${c.golden_ratio}">${grPill(c.golden_ratio)}</td>
+      <td class="num" data-sort="${c.ppv_unlocked}">${fmtNum(c.ppv_unlocked)}</td>
       <td class="num" data-sort="${c.unlock_ratio}">${urPill(c.unlock_ratio)}</td>
+      <td class="num" data-sort="${c.fans_chatted}">${fmtNum(c.fans_chatted)}</td>
+      <td class="num" data-sort="${c.fans_spent}">${fmtNum(c.fans_spent)}</td>
       <td class="num" data-sort="${c.fan_cvr}">${c.fan_cvr}%</td>
-      <td class="num" data-sort="${c.sales_per_hour}">${fmtMoney(c.sales_per_hour)}</td>
+      <td class="num" data-sort="${avgES}">${fmtMoney(avgES)}</td>
+      <td class="num" data-sort="${c.char_count}">${fmtNum(c.char_count)}</td>
       <td data-sort="${c.avg_replay_seconds}">${c.avg_replay_formatted} ${rtPill(c.avg_replay_seconds)}</td>
+      <td class="num" data-sort="${c.clocked_minutes}">${clockH}h</td>
+      <td class="num" data-sort="${c.sales_per_hour}">${fmtMoney(c.sales_per_hour)}</td>
+      <td class="num" data-sort="${mPerH}">${mPerH.toFixed?mPerH.toFixed(1):mPerH}</td>
       <td data-sort="${fp}">${fp}%<div class="progress-bar"><div class="progress-fill" style="width:${fp}%;background:${fc}"></div></div></td>
     </tr>`;
   }).join('');

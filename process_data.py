@@ -299,17 +299,21 @@ def main():
     # ---- EXTRA DEDUP: Remove renamed/deleted model duplicates ----
     # Some models get renamed (e.g. "Sara Blanc(delete)", "Sara(delete)", "sara(delete)")
     # producing rows with identical metrics but different Creator names.
-    # Dedup by Employee + ALL key metric columns (very conservative - virtually impossible
-    # for two legit different sessions to match in Sales+Msgs+PPV+Fans+Chars+Minutes).
+    # ONLY apply metric-based dedup to rows with "(delete)" in Creator name, to avoid
+    # removing legitimate entries where different models have the same metrics.
     dedup_metric_cols = [
         'Employees', 'Sales_num', 'Msgs_sent', 'PPVs_sent', 'PPVs_unlocked',
         'Fans_chatted', 'Fans_spent', 'Char_count'
     ]
-    db_before = len(df_db)
-    df_db = df_db.drop_duplicates(subset=dedup_metric_cols, keep='first')
-    db_metric_dupes = db_before - len(df_db)
-    if db_metric_dupes > 0:
-        print("   -> Duplicados por renombre de modelo eliminados: %d" % db_metric_dupes)
+    is_delete = df_db['Creators'].str.contains(r'\(delete\)', case=False, na=False)
+    df_delete = df_db[is_delete].copy()
+    df_normal = df_db[~is_delete].copy()
+    del_before = len(df_delete)
+    df_delete = df_delete.drop_duplicates(subset=dedup_metric_cols, keep='first')
+    del_removed = del_before - len(df_delete)
+    df_db = pd.concat([df_normal, df_delete], ignore_index=True)
+    if del_removed > 0:
+        print("   -> Duplicados por renombre de modelo (delete) eliminados: %d" % del_removed)
 
     # ================================================================
     # 3. LOAD SALES RECORDS (Feb 1-10 + Feb 11-13)
@@ -785,6 +789,8 @@ def main():
         ur = round(ppv_unlocked / ppv_sent * 100, 2) if ppv_sent > 0 else 0
         fan_cvr = round(fans_spent / fans_chatted * 100, 2) if fans_chatted > 0 else 0
         sales_per_hour = round(total_sales / (clocked_min / 60), 2) if clocked_min > 0 else 0
+        msgs_per_hour = round(total_msgs / (clocked_min / 60), 2) if clocked_min > 0 else 0
+        avg_earn_per_spender = round(total_sales / fans_spent, 2) if fans_spent > 0 else 0
 
         # Response time from message dashboard
         rt = msg_rows['Replay_seconds'].dropna()
@@ -876,6 +882,8 @@ def main():
             'clocked_minutes': clocked_min,
             'clocked_hours_formatted': '%dh %dm' % (clocked_min // 60, clocked_min % 60) if clocked_min > 0 else 'N/A',
             'sales_per_hour': sales_per_hour,
+            'msgs_per_hour': msgs_per_hour,
+            'avg_earn_per_spender': avg_earn_per_spender,
             'char_count': char_count,
             'days_worked': days_worked,
             'avg_replay_seconds': avg_resp,

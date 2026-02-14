@@ -132,6 +132,31 @@
     .sub-section { background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; padding: 16px; margin-bottom: 14px; }
     .sub-section h4 { font-size: 13px; font-weight: 600; margin-bottom: 10px; color: var(--text-secondary); }
 
+    /* Filter Bar */
+    .filter-bar { display: flex; gap: 8px; margin-bottom: 16px; flex-wrap: wrap; align-items: center; }
+    .filter-dropdown { position: relative; display: inline-block; }
+    .filter-btn { padding: 7px 14px; border-radius: 8px; border: 1px solid var(--border); background: var(--bg-card); color: var(--text-secondary); font-size: 12px; cursor: pointer; display: flex; align-items: center; gap: 6px; white-space: nowrap; }
+    .filter-btn:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+    .filter-btn.has-filter { border-color: var(--accent-blue); color: var(--accent-blue); background: rgba(79,140,255,.1); }
+    .filter-panel { display: none; position: absolute; top: 100%; left: 0; background: var(--bg-card); border: 1px solid var(--border); border-radius: 10px; min-width: 260px; z-index: 60; margin-top: 4px; box-shadow: 0 8px 32px rgba(0,0,0,.4); max-height: 400px; overflow: hidden; }
+    .filter-panel.open { display: flex; flex-direction: column; }
+    .filter-panel-header { padding: 10px 12px; border-bottom: 1px solid var(--border); display: flex; justify-content: space-between; align-items: center; }
+    .filter-panel-header h4 { font-size: 12px; color: var(--text-secondary); }
+    .filter-panel-body { overflow-y: auto; max-height: 320px; padding: 6px 0; }
+    .filter-option { padding: 7px 12px; font-size: 12px; cursor: pointer; color: var(--text-secondary); display: flex; align-items: center; gap: 8px; transition: all .12s; }
+    .filter-option:hover { background: var(--bg-hover); color: var(--text-primary); }
+    .filter-option.active { color: var(--accent-blue); }
+    .filter-option input[type=checkbox] { accent-color: var(--accent-blue); width: 14px; height: 14px; cursor: pointer; }
+    .filter-search { width: 100%; padding: 7px 10px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 6px; color: var(--text-primary); font-size: 11px; outline: none; }
+    .filter-search:focus { border-color: var(--accent-blue); }
+    .filter-quick-btns { display: flex; gap: 4px; flex-wrap: wrap; padding: 6px 12px; border-bottom: 1px solid var(--border); }
+    .filter-quick-btn { padding: 3px 8px; border-radius: 4px; border: 1px solid var(--border); background: transparent; color: var(--text-muted); font-size: 10px; cursor: pointer; }
+    .filter-quick-btn:hover { border-color: var(--accent-blue); color: var(--text-primary); }
+    .filter-quick-btn.active { background: var(--accent-blue); color: #fff; border-color: var(--accent-blue); }
+    .date-custom-row { display: flex; gap: 6px; padding: 8px 12px; border-top: 1px solid var(--border); }
+    .date-custom-row input { flex: 1; padding: 5px 8px; background: var(--bg-primary); border: 1px solid var(--border); border-radius: 5px; color: var(--text-primary); font-size: 11px; }
+    .filter-active-label { font-size: 10px; color: var(--accent-blue); margin-left: 4px; font-weight: 600; }
+
     @media (max-width: 768px) {
       .container { padding: 12px; }
       .charts-grid { grid-template-columns: 1fr; }
@@ -187,6 +212,9 @@
 <script>
 let D = null;
 const CI = {};
+let dateFilter = 'all'; // 'all','today','yesterday','last7','last30','last90','last365','thisMonth','lastMonth','custom'
+let dateCustomStart = null, dateCustomEnd = null;
+let selectedModels = []; // empty = all models
 
 async function loadData() {
   try {
@@ -208,6 +236,9 @@ function cc(id, cfg) { if(CI[id]) CI[id].destroy(); const c=document.getElementB
 function render() {
   $('reportDate').textContent = 'Reporte: ' + D.report_date;
   $('reportGen').textContent = 'Generado: ' + D.generated_at;
+  // Ensure daily_hourly & daily_model exist (backward compat)
+  if(!D.daily_hourly) D.daily_hourly=[];
+  if(!D.daily_model) D.daily_model=[];
   renderGeneral();
   renderShifts();
   renderModels();
@@ -251,32 +282,202 @@ function fmtMoney(v) { return '$'+Number(v).toLocaleString('en-US',{minimumFract
 function fmtNum(v) { return Number(v).toLocaleString('en-US'); }
 function esc(s) { return String(s).replace(/'/g,"\\'"); }
 
+// =============== DATE FILTER HELPERS ===============
+function getDateRange() {
+  const dates = D.daily.map(d=>d.date).sort();
+  const minD = dates[0], maxD = dates[dates.length-1];
+  const today = maxD; // last date in dataset
+  const yesterday = dates.length>1 ? dates[dates.length-2] : minD;
+  if(dateFilter==='all') return {start:minD,end:maxD};
+  if(dateFilter==='today') return {start:today,end:today};
+  if(dateFilter==='yesterday') return {start:yesterday,end:yesterday};
+  if(dateFilter==='custom' && dateCustomStart && dateCustomEnd) return {start:dateCustomStart,end:dateCustomEnd};
+  // For lastN days
+  const maxDate = new Date(maxD);
+  let daysBack = 0;
+  if(dateFilter==='last7') daysBack=6;
+  else if(dateFilter==='last30') daysBack=29;
+  else if(dateFilter==='last90') daysBack=89;
+  else if(dateFilter==='last365') daysBack=364;
+  else if(dateFilter==='thisMonth') { const s=new Date(maxDate.getFullYear(),maxDate.getMonth(),1); return {start:s.toISOString().slice(0,10),end:maxD}; }
+  else if(dateFilter==='lastMonth') { const s=new Date(maxDate.getFullYear(),maxDate.getMonth()-1,1); const e=new Date(maxDate.getFullYear(),maxDate.getMonth(),0); return {start:s.toISOString().slice(0,10),end:e.toISOString().slice(0,10)}; }
+  if(daysBack>0) { const s=new Date(maxDate); s.setDate(s.getDate()-daysBack); return {start:s.toISOString().slice(0,10),end:maxD}; }
+  return {start:minD,end:maxD};
+}
+function filterByDateRange(arr, dateField) {
+  const {start,end} = getDateRange();
+  return arr.filter(d => d[dateField]>=start && d[dateField]<=end);
+}
+function getFilteredDaily() { return filterByDateRange(D.daily,'date'); }
+function getFilteredDailyHourly() { return filterByDateRange(D.daily_hourly,'date'); }
+function getFilteredDailyModel() {
+  let dm = filterByDateRange(D.daily_model,'date');
+  if(selectedModels.length>0) dm = dm.filter(d=>selectedModels.includes(d.model));
+  return dm;
+}
+function computeFilteredGeneral() {
+  const fd = getFilteredDaily();
+  const fdm = getFilteredDailyModel();
+  const fdh = getFilteredDailyHourly();
+  // Aggregate daily data
+  const sales_net = fd.reduce((s,d)=>s+d.sales_net,0);
+  const msg_sales = fd.reduce((s,d)=>s+d.msg_sales,0);
+  const sub_sales = fd.reduce((s,d)=>s+d.sub_sales,0);
+  const tips = fd.reduce((s,d)=>s+d.tips,0);
+  const messages = fd.reduce((s,d)=>s+d.messages,0);
+  const fans_chatted = fd.reduce((s,d)=>s+d.fans_chatted,0);
+  const ppv_sent = fd.reduce((s,d)=>s+d.ppv_sent,0);
+  const transactions = fd.reduce((s,d)=>s+d.transactions,0);
+  // If model filter active, use daily_model data instead
+  let rev=sales_net, msgR=msg_sales, subR=sub_sales, tipR=tips, msgs=messages, fc=fans_chatted, ppv=ppv_sent;
+  if(selectedModels.length>0) {
+    rev=fdm.reduce((s,d)=>s+d.sales_net,0); msgR=fdm.reduce((s,d)=>s+d.msg_sales,0);
+    subR=fdm.reduce((s,d)=>s+d.sub_sales,0); tipR=fdm.reduce((s,d)=>s+d.tips,0);
+    msgs=fdm.reduce((s,d)=>s+d.messages,0); fc=fdm.reduce((s,d)=>s+d.fans_chatted,0);
+    ppv=fdm.reduce((s,d)=>s+d.ppv_sent,0);
+  }
+  // Build hourly from daily_hourly
+  const hourly = Array.from({length:24},(_,h)=>({hour:h,hour_label:`${String(h).padStart(2,'0')}:00`,fans_chatted:0,messages:0,ppv_sent:0,sales_net:0,msg_sales_net:0,sub_sales_net:0,tips_net:0,transactions:0}));
+  const src = selectedModels.length>0 ? fdm : fdh;
+  // For model-filtered, we need hourly from daily_model which doesn't have hourly granularity
+  // So use daily_hourly and filter by model if possible
+  if(selectedModels.length>0) {
+    // Filter daily_hourly entries where... we don't have model in daily_hourly
+    // Use model.hourly data instead
+    const selModels = D.models.filter(m=>selectedModels.includes(m.name));
+    selModels.forEach(m=>{
+      m.hourly.forEach(mh=>{hourly[mh.hour].fans_chatted+=mh.fans_chatted||0; hourly[mh.hour].sales_net+=mh.sales_net||0; hourly[mh.hour].messages+=mh.messages||0; hourly[mh.hour].ppv_sent+=mh.ppv_sent||0;});
+    });
+  } else {
+    fdh.forEach(dh=>{const h=hourly[dh.hour]; h.fans_chatted+=dh.fans_chatted; h.sales_net+=dh.sales_net; h.messages+=dh.messages; h.ppv_sent+=dh.ppv_sent; h.msg_sales_net+=dh.msg_sales_net; h.sub_sales_net+=dh.sub_sales_net; h.tips_net+=dh.tips_net; h.transactions+=dh.transactions;});
+  }
+  const peakTraffic = hourly.reduce((a,b)=>b.fans_chatted>a.fans_chatted?b:a, hourly[0]);
+  const peakSales = hourly.reduce((a,b)=>b.sales_net>a.sales_net?b:a, hourly[0]);
+  const grRatio = msgs>0?round2(ppv/msgs*100):0;
+  return {rev,msgR,subR,tipR,msgs,fc,ppv,hourly,peakTraffic,peakSales,grRatio,days:fd.length};
+}
+function round2(v){return Math.round(v*100)/100;}
+function getDateFilterLabel() {
+  const labels={'all':'Todo el periodo','today':'Hoy','yesterday':'Ayer','last7':'Ultimos 7 dias','last30':'Ultimos 30 dias','last90':'Ultimos 90 dias','last365':'Ultimo ano','thisMonth':'Este mes','lastMonth':'Mes anterior','custom':'Personalizado'};
+  return labels[dateFilter]||'Todo el periodo';
+}
+function setDateFilter(f) {
+  dateFilter=f;
+  document.querySelectorAll('.date-opt').forEach(o=>o.classList.toggle('active',o.dataset.filter===f));
+  if(f!=='custom') { renderGeneral(); closeDatePanel(); }
+}
+function applyCustomDate() {
+  const s=$('dateStart').value, e=$('dateEnd').value;
+  if(s&&e){dateCustomStart=s;dateCustomEnd=e;dateFilter='custom';renderGeneral();closeDatePanel();}
+}
+function closeDatePanel(){const p=$('dateFP');if(p)p.classList.remove('open');}
+function closeModelPanel(){const p=$('modelFP');if(p)p.classList.remove('open');}
+function toggleModelSelection(name) {
+  const idx=selectedModels.indexOf(name);
+  if(idx>-1) selectedModels.splice(idx,1); else selectedModels.push(name);
+  renderGeneral(); renderModels(); renderChatters(); renderHourly();
+}
+function setModelQuickFilter(type) {
+  if(type==='all') selectedModels=[];
+  else selectedModels=D.models.filter(m=>m.account_type===type).map(m=>m.name);
+  updateModelCheckboxes();
+  renderGeneral(); renderModels(); renderChatters(); renderHourly();
+}
+function updateModelCheckboxes() {
+  document.querySelectorAll('.model-chk').forEach(cb=>{cb.checked=selectedModels.length===0||selectedModels.includes(cb.value);});
+  document.querySelectorAll('.mq-btn').forEach(b=>b.classList.remove('active'));
+  if(selectedModels.length===0) document.querySelector('.mq-btn[data-t="all"]')?.classList.add('active');
+}
+function filterModelList(q) {
+  const ql=q.toLowerCase();
+  document.querySelectorAll('.model-opt-row').forEach(r=>{r.style.display=r.dataset.name.toLowerCase().includes(ql)?'':'none';});
+}
+
 // =============== GENERAL ===============
 function renderGeneral() {
   const g = D.general;
+  const f = computeFilteredGeneral();
+  const isFiltered = dateFilter!=='all' || selectedModels.length>0;
+  const rev=isFiltered?f.rev:g.total_net_revenue;
+  const msgR=isFiltered?f.msgR:g.msg_revenue;
+  const subR=isFiltered?f.subR:g.sub_revenue;
+  const tipR=isFiltered?f.tipR:g.tips_revenue;
+  const msgs=isFiltered?f.msgs:g.total_messages;
+  const fc=isFiltered?f.fc:g.total_fans_chatted;
+  const ppv=isFiltered?f.ppv:g.total_ppv_sent;
+  const hr=isFiltered?f.hourly:D.hourly;
+  const peakT=isFiltered?f.peakTraffic:D.peak_traffic_hour;
+  const peakS=isFiltered?f.peakSales:D.peak_sales_hour;
+  const grR=isFiltered?f.grRatio:g.golden_ratio;
+  const days=isFiltered?f.days:g.days_in_range;
+  // Date range info
+  const dateRng=getDateRange();
+  const dateLabel=dateFilter==='all'?D.report_date:`${dateRng.start} - ${dateRng.end}`;
+  const modLabel=selectedModels.length>0?selectedModels.length+' modelo'+(selectedModels.length>1?'s':''):'Todos';
+  // Build date options
+  const dateOpts = [
+    {id:'all',label:'Todo el periodo'},
+    {id:'today',label:'Hoy (ultimo dia)'},
+    {id:'yesterday',label:'Ayer'},
+    {id:'last7',label:'Ultimos 7 dias'},
+    {id:'last30',label:'Ultimos 30 dias'},
+    {id:'thisMonth',label:'Este mes'},
+    {id:'lastMonth',label:'Mes anterior'},
+  ];
   $('tab-general').innerHTML = `
+    <div class="filter-bar">
+      <div class="filter-dropdown">
+        <button class="filter-btn ${dateFilter!=='all'?'has-filter':''}" onclick="event.stopPropagation();$('dateFP').classList.toggle('open');closeModelPanel();">&#128197; ${getDateFilterLabel()} &#9662;</button>
+        <div class="filter-panel" id="dateFP">
+          <div class="filter-panel-header"><h4>Rango de Fechas</h4><span style="font-size:10px;color:var(--text-muted)">${days} dias</span></div>
+          <div class="filter-panel-body">
+            ${dateOpts.map(o=>`<div class="filter-option date-opt ${dateFilter===o.id?'active':''}" data-filter="${o.id}" onclick="setDateFilter('${o.id}')">${o.label}</div>`).join('')}
+          </div>
+          <div class="date-custom-row">
+            <input type="date" id="dateStart" value="${dateCustomStart||dateRng.start}" min="${D.daily[0]?.date}" max="${D.daily[D.daily.length-1]?.date}">
+            <input type="date" id="dateEnd" value="${dateCustomEnd||dateRng.end}" min="${D.daily[0]?.date}" max="${D.daily[D.daily.length-1]?.date}">
+            <button class="filter-quick-btn" onclick="applyCustomDate()" style="padding:5px 10px">Aplicar</button>
+          </div>
+        </div>
+      </div>
+      <div class="filter-dropdown">
+        <button class="filter-btn ${selectedModels.length>0?'has-filter':''}" onclick="event.stopPropagation();$('modelFP').classList.toggle('open');closeDatePanel();">&#128100; ${modLabel} &#9662;</button>
+        <div class="filter-panel" id="modelFP" style="min-width:300px">
+          <div class="filter-panel-header"><h4>Filtrar Modelos</h4></div>
+          <div class="filter-quick-btns">
+            <button class="filter-quick-btn mq-btn ${selectedModels.length===0?'active':''}" data-t="all" onclick="setModelQuickFilter('all')">Todos</button>
+            <button class="filter-quick-btn mq-btn" data-t="free" onclick="setModelQuickFilter('free')">Free</button>
+            <button class="filter-quick-btn mq-btn" data-t="paid" onclick="setModelQuickFilter('paid')">Paid</button>
+            <button class="filter-quick-btn mq-btn" data-t="mixta" onclick="setModelQuickFilter('mixta')">Mixtas</button>
+          </div>
+          <div style="padding:6px 12px"><input class="filter-search" placeholder="Buscar modelo..." oninput="filterModelList(this.value)"></div>
+          <div class="filter-panel-body">
+            ${D.models.map(m=>`<label class="filter-option model-opt-row" data-name="${m.name}"><input type="checkbox" class="model-chk" value="${m.name}" ${selectedModels.length===0||selectedModels.includes(m.name)?'checked':''} onchange="toggleModelSelection('${esc(m.name)}')">${m.name} <span style="font-size:9px;color:var(--text-muted);margin-left:auto">${m.account_type}</span></label>`).join('')}
+          </div>
+        </div>
+      </div>
+      ${isFiltered?`<span class="filter-active-label">Filtro activo: ${dateLabel} | ${modLabel}</span>`:''}
+    </div>
     <div class="kpi-grid">
-      <div class="kpi-card"><div class="kpi-label">Revenue Total (Net)</div><div class="kpi-value green">${fmtMoney(g.total_net_revenue)}</div><div class="kpi-detail">Ganancias netas del dia</div></div>
-      <div class="kpi-card"><div class="kpi-label">Revenue Mensajes</div><div class="kpi-value blue">${fmtMoney(g.msg_revenue)}</div><div class="kpi-detail">PPV + mensajes pagados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Revenue Suscripciones</div><div class="kpi-value purple">${fmtMoney(g.sub_revenue)}</div><div class="kpi-detail">New: ${fmtMoney(g.new_subs_revenue)} | Rec: ${fmtMoney(g.recurring_subs_revenue)}</div></div>
-      <div class="kpi-card"><div class="kpi-label">Revenue Tips</div><div class="kpi-value orange">${fmtMoney(g.tips_revenue)}</div><div class="kpi-detail">Propinas recibidas</div></div>
-      <div class="kpi-card"><div class="kpi-label">Ventas Chatters</div><div class="kpi-value cyan">${fmtMoney(g.chatter_attributed_sales)}</div><div class="kpi-detail">Atribuido a chatters</div></div>
-      <div class="kpi-card"><div class="kpi-label">Total Mensajes</div><div class="kpi-value blue">${fmtNum(g.total_messages)}</div><div class="kpi-detail">${g.total_chatters} chatters activos</div></div>
-      <div class="kpi-card"><div class="kpi-label">PPV Enviados</div><div class="kpi-value yellow">${fmtNum(g.total_ppv_sent)}</div><div class="kpi-detail">${g.total_ppv_unlocked} desbloqueados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Golden Ratio</div><div class="kpi-value ${g.golden_ratio>=5?'green':g.golden_ratio>=3?'yellow':'red'}">${g.golden_ratio}%</div><div class="kpi-detail">PPV / Total mensajes</div></div>
-      <div class="kpi-card"><div class="kpi-label">Unlock Ratio</div><div class="kpi-value ${g.unlock_ratio>=30?'green':g.unlock_ratio>=20?'yellow':'red'}">${g.unlock_ratio}%</div><div class="kpi-detail">Comprados / Enviados</div></div>
-      <div class="kpi-card"><div class="kpi-label">Fans Chateados</div><div class="kpi-value purple">${fmtNum(g.total_fans_chatted)}</div><div class="kpi-detail">${fmtNum(g.total_new_fans)} nuevos</div></div>
-      <div class="kpi-card"><div class="kpi-label">New Subs Revenue</div><div class="kpi-value cyan">${fmtMoney(g.new_subs_revenue)}</div><div class="kpi-detail">Suscriptores nuevos</div></div>
+      <div class="kpi-card"><div class="kpi-label">Revenue Total (Net)</div><div class="kpi-value green">${fmtMoney(rev)}</div><div class="kpi-detail">${days} dias</div></div>
+      <div class="kpi-card"><div class="kpi-label">Revenue Mensajes</div><div class="kpi-value blue">${fmtMoney(msgR)}</div><div class="kpi-detail">PPV + mensajes pagados</div></div>
+      <div class="kpi-card"><div class="kpi-label">Revenue Suscripciones</div><div class="kpi-value purple">${fmtMoney(subR)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Revenue Tips</div><div class="kpi-value orange">${fmtMoney(tipR)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Total Mensajes</div><div class="kpi-value blue">${fmtNum(msgs)}</div><div class="kpi-detail">${g.total_chatters} chatters</div></div>
+      <div class="kpi-card"><div class="kpi-label">PPV Enviados</div><div class="kpi-value yellow">${fmtNum(ppv)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">Golden Ratio</div><div class="kpi-value ${grR>=5?'green':grR>=3?'yellow':'red'}">${grR}%</div><div class="kpi-detail">PPV / Total mensajes</div></div>
+      <div class="kpi-card"><div class="kpi-label">Fans Chateados</div><div class="kpi-value purple">${fmtNum(fc)}</div></div>
+      <div class="kpi-card"><div class="kpi-label">New Subs Revenue</div><div class="kpi-value cyan">${fmtMoney(g.new_subs_revenue)}</div></div>
       <div class="kpi-card"><div class="kpi-label">Resp. Promedio</div><div class="kpi-value pink">${g.avg_replay_formatted}</div><div class="kpi-detail">Mediana: ${g.median_replay_formatted}</div></div>
     </div>
     <div class="peak-grid">
-      <div class="peak-card"><div class="peak-icon traffic">&#128200;</div><div class="peak-info"><h4>Hora Pico Trafico</h4><div class="pv" style="color:var(--accent-blue)">${D.peak_traffic_hour.hour_label}</div><div class="pd">${fmtNum(D.peak_traffic_hour.messages)} mensajes</div></div></div>
-      <div class="peak-card"><div class="peak-icon sales">&#128176;</div><div class="peak-info"><h4>Hora Pico Ventas</h4><div class="pv" style="color:var(--accent-green)">${D.peak_sales_hour.hour_label}</div><div class="pd">${fmtMoney(D.peak_sales_hour.revenue)} revenue</div></div></div>
+      <div class="peak-card"><div class="peak-icon traffic">&#128200;</div><div class="peak-info"><h4>Hora Pico Trafico</h4><div class="pv" style="color:var(--accent-blue)">${peakT.hour_label}</div><div class="pd">${fmtNum(peakT.fans_chatted)} fans chateados</div></div></div>
+      <div class="peak-card"><div class="peak-icon sales">&#128176;</div><div class="peak-info"><h4>Hora Pico Ventas</h4><div class="pv" style="color:var(--accent-green)">${peakS.hour_label}</div><div class="pd">${fmtMoney(peakS.sales_net||peakS.revenue||0)}</div></div></div>
       <div class="peak-card"><div class="peak-icon speed">&#9889;</div><div class="peak-info"><h4>Velocidad Respuesta</h4><div class="pv" style="color:var(--accent-yellow)">${g.avg_replay_formatted}</div><div class="pd">Mediana: ${g.median_replay_formatted}</div></div></div>
       <div class="peak-card"><div class="peak-icon fans">&#128101;</div><div class="peak-info"><h4>Fans Nuevos</h4><div class="pv" style="color:var(--accent-purple)">${fmtNum(g.total_new_fans)}</div><div class="pd">${fmtNum(g.total_active_fans)} activos total</div></div></div>
     </div>
     <div class="charts-grid">
-      <div class="chart-card full"><div class="chart-title"><span class="dot blue"></span> Mensajes vs Revenue por Hora</div><div class="chart-container"><canvas id="cGenHourly"></canvas></div></div>
+      <div class="chart-card full"><div class="chart-title"><span class="dot blue"></span> Fans Chateados vs Revenue por Hora</div><div class="chart-container"><canvas id="cGenHourly"></canvas></div></div>
     </div>
     <div class="charts-grid">
       <div class="chart-card"><div class="chart-title"><span class="dot green"></span> Top 10 Modelos por Revenue</div><div class="chart-container"><canvas id="cTopModRev"></canvas></div></div>
@@ -284,26 +485,30 @@ function renderGeneral() {
     </div>
     <div class="charts-grid">
       <div class="chart-card"><div class="chart-title"><span class="dot cyan"></span> Revenue por Tipo</div><div class="chart-container"><canvas id="cRevType"></canvas></div></div>
-      <div class="chart-card"><div class="chart-title"><span class="dot yellow"></span> Suscripciones: New vs Recurring</div><div class="chart-container"><canvas id="cSubsType"></canvas></div></div>
+      <div class="chart-card"><div class="chart-title"><span class="dot yellow"></span> Revenue Diario</div><div class="chart-container"><canvas id="cDailyRev"></canvas></div></div>
     </div>
   `;
   // Charts
-  const h = D.hourly, lbl = h.map(x=>x.hour_label);
+  const lbl = hr.map(x=>x.hour_label);
   cc('cGenHourly',{type:'bar',data:{labels:lbl,datasets:[
-    {label:'Mensajes',data:h.map(x=>x.messages),backgroundColor:'rgba(79,140,255,.6)',borderRadius:4,yAxisID:'y',order:2},
-    {label:'Revenue ($)',data:h.map(x=>x.sales_net),borderColor:'rgba(52,211,153,1)',backgroundColor:'rgba(52,211,153,.1)',borderWidth:2,type:'line',fill:true,tension:.3,pointRadius:3,yAxisID:'y1',order:1}
+    {label:'Fans Chateados',data:hr.map(x=>x.fans_chatted),backgroundColor:'rgba(79,140,255,.6)',borderRadius:4,yAxisID:'y',order:2},
+    {label:'Revenue ($)',data:hr.map(x=>x.sales_net),borderColor:'rgba(52,211,153,1)',backgroundColor:'rgba(52,211,153,.1)',borderWidth:2,type:'line',fill:true,tension:.3,pointRadius:3,yAxisID:'y1',order:1}
   ]},options:{responsive:true,maintainAspectRatio:false,interaction:{mode:'index',intersect:false},plugins:{legend:{labels:{color:'#9ca3af'}}},scales:{x:{grid:{color:'#1e2235'},ticks:{color:'#6b7280'}},y:{position:'left',grid:{color:'#1e2235'},ticks:{color:'#6b7280'}},y1:{position:'right',grid:{display:false},ticks:{color:'#34d399',callback:v=>'$'+v}}}}});
 
-  const topM = D.models.slice(0,10);
+  const filteredModels = selectedModels.length>0?D.models.filter(m=>selectedModels.includes(m.name)):D.models;
+  const topM = filteredModels.slice(0,10);
   cc('cTopModRev',{type:'bar',data:{labels:topM.map(m=>m.name),datasets:[{data:topM.map(m=>m.total_earnings),backgroundColor:topM.map((_,i)=>`hsla(${150+i*15},70%,50%,.7)`),borderRadius:6}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}}},scales:{x:{grid:{color:'#1e2235'},ticks:{color:'#6b7280',callback:v=>'$'+v}},y:{grid:{display:false},ticks:{color:'#9ca3af',font:{size:10}}}}}});
 
   const topC = D.chatters.slice(0,10);
   cc('cTopChatRev',{type:'bar',data:{labels:topC.map(c=>c.name.split(' ').slice(0,2).join(' ')),datasets:[{data:topC.map(c=>c.total_sales),backgroundColor:topC.map((_,i)=>`hsla(${260+i*12},65%,55%,.7)`),borderRadius:6}]},options:{indexAxis:'y',responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}}},scales:{x:{grid:{color:'#1e2235'},ticks:{color:'#6b7280',callback:v=>'$'+v}},y:{grid:{display:false},ticks:{color:'#9ca3af',font:{size:10}}}}}});
 
-  const g2 = D.general;
-  cc('cRevType',{type:'doughnut',data:{labels:['Mensajes','Suscripciones','Tips'],datasets:[{data:[g2.msg_revenue,g2.sub_revenue,g2.tips_revenue],backgroundColor:['rgba(79,140,255,.8)','rgba(167,139,250,.8)','rgba(251,191,36,.8)'],borderColor:'transparent'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{color:'#9ca3af',padding:10}}}}});
+  cc('cRevType',{type:'doughnut',data:{labels:['Mensajes','Suscripciones','Tips'],datasets:[{data:[msgR,subR,tipR],backgroundColor:['rgba(79,140,255,.8)','rgba(167,139,250,.8)','rgba(251,191,36,.8)'],borderColor:'transparent'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{color:'#9ca3af',padding:10}}}}});
 
-  cc('cSubsType',{type:'doughnut',data:{labels:['New Subs','Recurring Subs'],datasets:[{data:[g2.new_subs_revenue,g2.recurring_subs_revenue],backgroundColor:['rgba(34,211,238,.8)','rgba(167,139,250,.8)'],borderColor:'transparent'}]},options:{responsive:true,maintainAspectRatio:false,cutout:'55%',plugins:{legend:{position:'bottom',labels:{color:'#9ca3af',padding:10}}}}});
+  // Daily revenue chart
+  const fd = getFilteredDaily();
+  cc('cDailyRev',{type:'bar',data:{labels:fd.map(d=>d.date_label),datasets:[
+    {label:'Revenue',data:fd.map(d=>d.sales_net),backgroundColor:'rgba(52,211,153,.6)',borderRadius:4},
+  ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{callbacks:{label:c=>fmtMoney(c.raw)}}},scales:{x:{grid:{color:'#1e2235'},ticks:{color:'#6b7280'}},y:{grid:{color:'#1e2235'},ticks:{color:'#6b7280',callback:v=>'$'+v}}}}});
 }
 
 // =============== SHIFTS ===============
@@ -364,13 +569,14 @@ function setModelFilter(type, btn) {
 
 function renderModels() {
   const el = $('tab-models');
-  const freeCount = D.models.filter(m=>m.account_type==='free').length;
-  const paidCount = D.models.filter(m=>m.account_type==='paid').length;
-  const mixtaCount = D.models.filter(m=>m.account_type==='mixta').length;
+  const visModels = selectedModels.length>0?D.models.filter(m=>selectedModels.includes(m.name)):D.models;
+  const freeCount = visModels.filter(m=>m.account_type==='free').length;
+  const paidCount = visModels.filter(m=>m.account_type==='paid').length;
+  const mixtaCount = visModels.filter(m=>m.account_type==='mixta').length;
   el.innerHTML = `
-    <div class="section-title">Analisis por Modelo <span class="count" id="modFilterCount">${D.models.length} modelos</span></div>
+    <div class="section-title">Analisis por Modelo <span class="count" id="modFilterCount">${visModels.length} modelos</span></div>
     <div style="display:flex;gap:6px;margin-bottom:16px;flex-wrap:wrap">
-      <button class="nav-tab model-filter-btn active" onclick="setModelFilter('all',this)" style="padding:7px 16px;font-size:12px">Todos (${D.models.length})</button>
+      <button class="nav-tab model-filter-btn active" onclick="setModelFilter('all',this)" style="padding:7px 16px;font-size:12px">Todos (${visModels.length})</button>
       <button class="nav-tab model-filter-btn" onclick="setModelFilter('free',this)" style="padding:7px 16px;font-size:12px;border:1px solid rgba(52,211,153,.3)">Free (${freeCount})</button>
       <button class="nav-tab model-filter-btn" onclick="setModelFilter('paid',this)" style="padding:7px 16px;font-size:12px;border:1px solid rgba(167,139,250,.3)">Paid (${paidCount})</button>
       <button class="nav-tab model-filter-btn" onclick="setModelFilter('mixta',this)" style="padding:7px 16px;font-size:12px;border:1px solid rgba(251,191,36,.3)">Mixtas (${mixtaCount})</button>
@@ -404,7 +610,7 @@ function renderModels() {
     </div>
   `;
   const typeBadge = (t) => t==='free'?'<span class="pill" style="background:rgba(52,211,153,.15);color:var(--accent-green)">Free</span>':t==='paid'?'<span class="pill" style="background:rgba(167,139,250,.15);color:var(--accent-purple)">Paid</span>':t==='mixta'?'<span class="pill" style="background:rgba(251,191,36,.15);color:#fbbf24">Mixta</span>':'<span class="pill warn">?</span>';
-  $('modTblBody').innerHTML = D.models.map((m,i) => `<tr data-type="${m.account_type}">
+  $('modTblBody').innerHTML = visModels.map((m,i) => `<tr data-type="${m.account_type}">
     <td data-sort="${i}">${rb(i)}</td>
     <td><a class="clickable" onclick="openModel('${esc(m.name)}')">${m.name}</a></td>
     <td>${typeBadge(m.account_type)}</td>
@@ -431,8 +637,9 @@ function renderModels() {
 // =============== CHATTERS ===============
 function renderChatters() {
   const el = $('tab-chatters');
+  const visChatters = selectedModels.length>0?D.chatters.filter(c=>c.models.some(m=>selectedModels.includes(m.name))):D.chatters;
   el.innerHTML = `
-    <div class="section-title">Analisis por Chatter <span class="count">${D.chatters.length} chatters</span></div>
+    <div class="section-title">Analisis por Chatter <span class="count">${visChatters.length} chatters</span></div>
     <div class="table-card">
       <div class="table-header"><h3>Todos los Chatters</h3><input class="search-input" placeholder="Buscar chatter..." oninput="filterTbl('chatTbl',this.value)"></div>
       <div class="table-scroll">
@@ -455,7 +662,7 @@ function renderChatters() {
       </div>
     </div>
   `;
-  $('chatTblBody').innerHTML = D.chatters.map((c,i) => {
+  $('chatTblBody').innerHTML = visChatters.map((c,i) => {
     const tb = c.response_buckets;
     const tot = tb.under_2m+tb.btwn_2_5m+tb.btwn_5_10m+tb.over_10m;
     const fp = tot>0?Math.round((tb.under_2m+tb.btwn_2_5m)/tot*100):0;
@@ -481,15 +688,23 @@ function renderChatters() {
 
 // =============== HOURLY ===============
 function renderHourly() {
-  const h = D.hourly, lbl = h.map(x=>x.hour_label);
+  // If model filter active, aggregate hourly from selected models
+  let h = D.hourly;
+  if(selectedModels.length>0) {
+    h = Array.from({length:24},(_,i)=>({hour:i,hour_label:`${String(i).padStart(2,'0')}:00`,fans_chatted:0,messages:0,ppv_sent:0,sales_net:0,msg_sales_net:0,sub_sales_net:0,tips_net:0}));
+    D.models.filter(m=>selectedModels.includes(m.name)).forEach(m=>{m.hourly.forEach(mh=>{h[mh.hour].fans_chatted+=mh.fans_chatted||0; h[mh.hour].sales_net+=mh.sales_net||0; h[mh.hour].messages+=mh.messages||0; h[mh.hour].ppv_sent+=mh.ppv_sent||0;});});
+  }
+  const lbl = h.map(x=>x.hour_label);
+  const peakT = h.reduce((a,b)=>b.fans_chatted>a.fans_chatted?b:a, h[0]);
+  const peakS = h.reduce((a,b)=>b.sales_net>a.sales_net?b:a, h[0]);
   $('tab-hourly').innerHTML = `
     <div class="section-title">Analisis por Horas</div>
     <div class="peak-grid">
-      <div class="peak-card"><div class="peak-icon traffic">&#128200;</div><div class="peak-info"><h4>Peak Trafico</h4><div class="pv" style="color:var(--accent-blue)">${D.peak_traffic_hour.hour_label}</div><div class="pd">${fmtNum(D.peak_traffic_hour.messages)} msgs</div></div></div>
-      <div class="peak-card"><div class="peak-icon sales">&#128176;</div><div class="peak-info"><h4>Peak Ventas</h4><div class="pv" style="color:var(--accent-green)">${D.peak_sales_hour.hour_label}</div><div class="pd">${fmtMoney(D.peak_sales_hour.revenue)}</div></div></div>
+      <div class="peak-card"><div class="peak-icon traffic">&#128200;</div><div class="peak-info"><h4>Peak Trafico</h4><div class="pv" style="color:var(--accent-blue)">${peakT.hour_label}</div><div class="pd">${fmtNum(peakT.fans_chatted)} fans</div></div></div>
+      <div class="peak-card"><div class="peak-icon sales">&#128176;</div><div class="peak-info"><h4>Peak Ventas</h4><div class="pv" style="color:var(--accent-green)">${peakS.hour_label}</div><div class="pd">${fmtMoney(peakS.sales_net)}</div></div></div>
     </div>
     <div class="charts-grid">
-      <div class="chart-card full"><div class="chart-title"><span class="dot blue"></span> Trafico por Hora</div><div class="chart-container"><canvas id="cHrTraffic"></canvas></div></div>
+      <div class="chart-card full"><div class="chart-title"><span class="dot blue"></span> Fans Chateados por Hora</div><div class="chart-container"><canvas id="cHrTraffic"></canvas></div></div>
     </div>
     <div class="charts-grid">
       <div class="chart-card full"><div class="chart-title"><span class="dot green"></span> Revenue por Hora (desglosado)</div><div class="chart-container"><canvas id="cHrRevenue"></canvas></div></div>
@@ -498,12 +713,12 @@ function renderHourly() {
       <div class="chart-card full"><div class="chart-title"><span class="dot purple"></span> PPV Enviados por Hora</div><div class="chart-container"><canvas id="cHrPPV"></canvas></div></div>
     </div>
   `;
-  cc('cHrTraffic',{type:'bar',data:{labels:lbl,datasets:[{label:'Mensajes',data:h.map(x=>x.messages),backgroundColor:h.map(x=>{const mx=Math.max(...h.map(z=>z.messages));const r=x.messages/mx;return r>.9?'rgba(79,140,255,.9)':r>.6?'rgba(79,140,255,.6)':'rgba(79,140,255,.3)';}),borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e2235'},ticks:{color:'#6b7280'}},y:{grid:{color:'#1e2235'},ticks:{color:'#6b7280'}}}}});
+  cc('cHrTraffic',{type:'bar',data:{labels:lbl,datasets:[{label:'Fans Chateados',data:h.map(x=>x.fans_chatted),backgroundColor:h.map(x=>{const mx=Math.max(...h.map(z=>z.fans_chatted));const r=mx>0?x.fans_chatted/mx:0;return r>.9?'rgba(79,140,255,.9)':r>.6?'rgba(79,140,255,.6)':'rgba(79,140,255,.3)';}),borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e2235'},ticks:{color:'#6b7280'}},y:{grid:{color:'#1e2235'},ticks:{color:'#6b7280'}}}}});
 
   cc('cHrRevenue',{type:'bar',data:{labels:lbl,datasets:[
-    {label:'Mensajes',data:h.map(x=>x.msg_sales_net),backgroundColor:'rgba(79,140,255,.7)',borderRadius:4},
-    {label:'Suscripciones',data:h.map(x=>x.sub_sales_net),backgroundColor:'rgba(167,139,250,.7)',borderRadius:4},
-    {label:'Tips',data:h.map(x=>x.tips_net),backgroundColor:'rgba(251,191,36,.7)',borderRadius:4}
+    {label:'Mensajes',data:h.map(x=>x.msg_sales_net||0),backgroundColor:'rgba(79,140,255,.7)',borderRadius:4},
+    {label:'Suscripciones',data:h.map(x=>x.sub_sales_net||0),backgroundColor:'rgba(167,139,250,.7)',borderRadius:4},
+    {label:'Tips',data:h.map(x=>x.tips_net||0),backgroundColor:'rgba(251,191,36,.7)',borderRadius:4}
   ]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#9ca3af'}},tooltip:{callbacks:{label:c=>c.dataset.label+': '+fmtMoney(c.raw)}}},scales:{x:{stacked:true,grid:{color:'#1e2235'},ticks:{color:'#6b7280'}},y:{stacked:true,grid:{color:'#1e2235'},ticks:{color:'#6b7280',callback:v=>'$'+v}}}}});
 
   cc('cHrPPV',{type:'bar',data:{labels:lbl,datasets:[{label:'PPV Enviados',data:h.map(x=>x.ppv_sent),backgroundColor:'rgba(167,139,250,.7)',borderRadius:5}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false}},scales:{x:{grid:{color:'#1e2235'},ticks:{color:'#6b7280'}},y:{grid:{color:'#1e2235'},ticks:{color:'#6b7280'}}}}});
@@ -641,7 +856,10 @@ function toggleDropdown(e) {
   const dd = e.target.closest('.dropdown');
   dd.classList.toggle('open');
 }
-document.addEventListener('click',(e)=>{if(!e.target.closest('.dropdown'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));});
+document.addEventListener('click',(e)=>{
+  if(!e.target.closest('.dropdown'))document.querySelectorAll('.dropdown').forEach(d=>d.classList.remove('open'));
+  if(!e.target.closest('.filter-dropdown')){closeDatePanel();closeModelPanel();}
+});
 
 function filterTbl(id, q) {
   const rows=$(id).querySelectorAll('tbody tr');

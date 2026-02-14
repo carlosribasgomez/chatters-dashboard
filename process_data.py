@@ -246,6 +246,10 @@ def main():
 
     # Parse date for daily breakdown
     df_msg['Date'] = pd.to_datetime(df_msg['Sent date'], errors='coerce')
+    df_msg['DateStr'] = df_msg['Date'].dt.date  # for groupby
+
+    # Extract fan identifier from 'Sent to' column for unique fan counting
+    df_msg['Fan_ID'] = df_msg['Sent to'].astype(str).str.strip()
 
     # ================================================================
     # 2. LOAD DETAILED BREAKDOWNS (Feb 1-10 + Feb 11-13)
@@ -409,6 +413,7 @@ def main():
             'hour_label': '%02d:00' % hour,
             'shift': get_shift(hour),
             'messages': len(msg_h),
+            'fans_chatted': int(msg_h['Fan_ID'].nunique()),
             'ppv_sent': int(msg_h['is_ppv'].sum()),
             'sales_net': round(float(sales_h['Net'].sum()), 2),
             'msg_sales_net': round(float(sales_h[sales_h['Type'] == 'Messages']['Net'].sum()), 2),
@@ -417,15 +422,16 @@ def main():
             'transactions': len(sales_h),
         })
 
-    peak_traffic = max(hourly_data, key=lambda x: x['messages'])
+    peak_traffic = max(hourly_data, key=lambda x: x['fans_chatted'])
     peak_sales = max(hourly_data, key=lambda x: x['sales_net'])
 
     # ================================================================
     # COMPUTE: Daily data
     # ================================================================
     daily_data = []
-    for date in sorted(df_msg['Date'].dt.date.dropna().unique()):
-        msg_d = df_msg[df_msg['Date'].dt.date == date]
+    all_dates_sorted = sorted(df_msg['Date'].dt.date.dropna().unique())
+    for date in all_dates_sorted:
+        msg_d = df_msg[df_msg['DateStr'] == date]
         sales_d = df_sales_valid[df_sales_valid['Date'] == date]
         rt_d = msg_d['Replay_seconds'].dropna()
 
@@ -433,6 +439,7 @@ def main():
             'date': date.isoformat(),
             'date_label': date.strftime('%b %d'),
             'messages': len(msg_d),
+            'fans_chatted': int(msg_d['Fan_ID'].nunique()),
             'sales_net': round(float(sales_d['Net'].sum()), 2),
             'msg_sales': round(float(sales_d[sales_d['Type'] == 'Messages']['Net'].sum()), 2),
             'sub_sales': round(float(sales_d[sales_d['Type'] == 'Subscription']['Net'].sum()), 2),
@@ -441,6 +448,61 @@ def main():
             'ppv_sent': int(msg_d['is_ppv'].sum()),
             'avg_replay_seconds': round(float(rt_d.mean()), 1) if len(rt_d) > 0 else 0,
         })
+
+    # ================================================================
+    # COMPUTE: Daily Hourly data (for date filter recalculation)
+    # ================================================================
+    print("   Generando daily_hourly...")
+    daily_hourly = []
+    for date in all_dates_sorted:
+        msg_d = df_msg[df_msg['DateStr'] == date]
+        sales_d = df_sales_valid[df_sales_valid['Date'] == date]
+        for hour in range(24):
+            msg_dh = msg_d[msg_d['Hour'] == hour]
+            sales_dh = sales_d[sales_d['Hour'] == hour]
+            if len(msg_dh) == 0 and len(sales_dh) == 0:
+                continue
+            daily_hourly.append({
+                'date': date.isoformat(),
+                'hour': hour,
+                'messages': len(msg_dh),
+                'fans_chatted': int(msg_dh['Fan_ID'].nunique()),
+                'ppv_sent': int(msg_dh['is_ppv'].sum()),
+                'sales_net': round(float(sales_dh['Net'].sum()), 2),
+                'msg_sales_net': round(float(sales_dh[sales_dh['Type'] == 'Messages']['Net'].sum()), 2),
+                'sub_sales_net': round(float(sales_dh[sales_dh['Type'] == 'Subscription']['Net'].sum()), 2),
+                'tips_net': round(float(sales_dh[sales_dh['Type'].astype(str).str.startswith('Tips')]['Net'].sum()), 2),
+                'transactions': len(sales_dh),
+            })
+    print("   daily_hourly: %d entradas" % len(daily_hourly))
+
+    # ================================================================
+    # COMPUTE: Daily Model data (for date + model filter combination)
+    # ================================================================
+    print("   Generando daily_model...")
+    daily_model = []
+    all_creators_list = sorted(set(df_msg['Creator'].dropna().unique()) | set(df_sales_valid['Creator'].dropna().unique()))
+    for date in all_dates_sorted:
+        msg_d = df_msg[df_msg['DateStr'] == date]
+        sales_d = df_sales_valid[df_sales_valid['Date'] == date]
+        for creator in all_creators_list:
+            msg_dc = msg_d[msg_d['Creator'] == creator]
+            sales_dc = sales_d[sales_d['Creator'] == creator]
+            if len(msg_dc) == 0 and len(sales_dc) == 0:
+                continue
+            daily_model.append({
+                'date': date.isoformat(),
+                'model': creator,
+                'messages': len(msg_dc),
+                'fans_chatted': int(msg_dc['Fan_ID'].nunique()),
+                'ppv_sent': int(msg_dc['is_ppv'].sum()),
+                'sales_net': round(float(sales_dc['Net'].sum()), 2),
+                'msg_sales': round(float(sales_dc[sales_dc['Type'] == 'Messages']['Net'].sum()), 2),
+                'sub_sales': round(float(sales_dc[sales_dc['Type'] == 'Subscription']['Net'].sum()), 2),
+                'tips': round(float(sales_dc[sales_dc['Type'].astype(str).str.startswith('Tips')]['Net'].sum()), 2),
+                'transactions': len(sales_dc),
+            })
+    print("   daily_model: %d entradas" % len(daily_model))
 
     # ================================================================
     # COMPUTE: Shift data
@@ -464,6 +526,7 @@ def main():
         shifts_data[shift_key] = {
             'label': shift_label,
             'messages': len(msg_s),
+            'fans_chatted': int(msg_s['Fan_ID'].nunique()),
             'sales_net': round(float(sales_s['Net'].sum()), 2),
             'msg_sales': round(float(sales_s[sales_s['Type'] == 'Messages']['Net'].sum()), 2),
             'sub_sales': round(float(sales_s[sales_s['Type'] == 'Subscription']['Net'].sum()), 2),
@@ -561,12 +624,13 @@ def main():
                     'hour': hour,
                     'hour_label': '%02d:00' % hour,
                     'messages': len(mh),
+                    'fans_chatted': int(mh['Fan_ID'].nunique()),
                     'ppv_sent': int(mh['is_ppv'].sum()),
                     'sales_net': round(float(sh['Net'].sum()), 2),
                 })
 
-        # Peak hours for this model
-        peak_traffic_h = max(model_hourly, key=lambda x: x['messages'])['hour_label'] if model_hourly else 'N/A'
+        # Peak hours for this model (traffic = fans chatted, not messages)
+        peak_traffic_h = max(model_hourly, key=lambda x: x['fans_chatted'])['hour_label'] if model_hourly else 'N/A'
         peak_sales_h = max(model_hourly, key=lambda x: x['sales_net'])['hour_label'] if model_hourly and total_earnings > 0 else 'N/A'
 
         # Chatters working this model - aggregate per chatter across all days
@@ -824,7 +888,7 @@ def main():
         'general': general,
         'peak_traffic_hour': {
             'hour_label': peak_traffic['hour_label'],
-            'messages': peak_traffic['messages'],
+            'fans_chatted': peak_traffic['fans_chatted'],
         },
         'peak_sales_hour': {
             'hour_label': peak_sales['hour_label'],
@@ -832,6 +896,8 @@ def main():
         },
         'hourly': hourly_data,
         'daily': daily_data,
+        'daily_hourly': daily_hourly,
+        'daily_model': daily_model,
         'shifts': shifts_data,
         'models': models_data,
         'chatters': chatters_data,

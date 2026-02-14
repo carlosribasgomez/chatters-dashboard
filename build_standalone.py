@@ -10,7 +10,7 @@ import re
 
 HTML_PATH = r'c:\Users\carlo\Carlos Ribas Cursor Projects\chatters-dashboard\index.html'
 JSON_PATH = r'c:\Users\carlo\Carlos Ribas Cursor Projects\chatters-dashboard\dashboard_data.json'
-OUTPUT_PATH = r'c:\Users\carlo\Carlos Ribas Cursor Projects\chatters-dashboard\Chatters_Dashboard_Feb12_2026.html'
+OUTPUT_PATH = r'c:\Users\carlo\Carlos Ribas Cursor Projects\chatters-dashboard\Chatters_Dashboard_Feb1_13_2026.html'
 
 with open(JSON_PATH, 'r', encoding='utf-8') as f:
     data = json.load(f)

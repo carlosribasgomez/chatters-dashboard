@@ -296,6 +296,21 @@ def main():
     date_col_db = [c for c in df_db.columns if 'date' in c.lower() and 'time' in c.lower()]
     df_db['Date'] = pd.to_datetime(df_db[date_col_db[0]], errors='coerce') if date_col_db else pd.NaT
 
+    # ---- EXTRA DEDUP: Remove renamed/deleted model duplicates ----
+    # Some models get renamed (e.g. "Sara Blanc(delete)", "Sara(delete)", "sara(delete)")
+    # producing rows with identical metrics but different Creator names.
+    # Dedup by Employee + ALL key metric columns (very conservative - virtually impossible
+    # for two legit different sessions to match in Sales+Msgs+PPV+Fans+Chars+Minutes).
+    dedup_metric_cols = [
+        'Employees', 'Sales_num', 'Msgs_sent', 'PPVs_sent', 'PPVs_unlocked',
+        'Fans_chatted', 'Fans_spent', 'Char_count'
+    ]
+    db_before = len(df_db)
+    df_db = df_db.drop_duplicates(subset=dedup_metric_cols, keep='first')
+    db_metric_dupes = db_before - len(df_db)
+    if db_metric_dupes > 0:
+        print("   -> Duplicados por renombre de modelo eliminados: %d" % db_metric_dupes)
+
     # ================================================================
     # 3. LOAD SALES RECORDS (Feb 1-10 + Feb 11-13)
     # ================================================================

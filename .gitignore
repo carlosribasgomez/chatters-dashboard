@@ -1,0 +1,7 @@
+# Tokens y credenciales
+hubstaff_token.json
+.env
+
+# Python
+__pycache__/
+*.pyc

@@ -10,6 +10,7 @@ Fuentes (en pares: Feb 1-10 + Feb 11-13):
 """
 
 import json
+import os
 import re
 import sys
 from collections import defaultdict
@@ -762,6 +763,20 @@ def main():
     models_data.sort(key=lambda x: x['total_earnings'], reverse=True)
 
     # ================================================================
+    # LOAD HUBSTAFF HOURS (replaces unreliable Inflow clocked hours)
+    # ================================================================
+    hubstaff_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), 'hubstaff_hours.json')
+    hubstaff_hours = {}
+    if os.path.exists(hubstaff_path):
+        with open(hubstaff_path, 'r', encoding='utf-8') as hf:
+            hdata = json.load(hf)
+            for chatter_name, info in hdata.get('chatters', {}).items():
+                hubstaff_hours[chatter_name] = info.get('total_minutes', 0)
+        print("  Hubstaff: %d chatters con horas reales cargadas" % len(hubstaff_hours))
+    else:
+        print("  AVISO: hubstaff_hours.json no encontrado, usando horas de Inflow")
+
+    # ================================================================
     # COMPUTE: Per Chatter (combining all sources, aggregated across days)
     # ================================================================
     chatters_data = []
@@ -782,8 +797,16 @@ def main():
         fans_chatted = int(db_rows['Fans_chatted'].sum())
         fans_spent = int(db_rows['Fans_spent'].sum())
         char_count = int(db_rows['Char_count'].sum())
-        clocked_min = int(db_rows['Clocked_min'].sum())
         days_worked = db_rows['Date'].dt.date.nunique()
+
+        # Use Hubstaff hours if available, otherwise fall back to Inflow
+        emp_str = str(emp)
+        if emp_str in hubstaff_hours and hubstaff_hours[emp_str] > 0:
+            clocked_min = round(hubstaff_hours[emp_str])
+            hours_source = 'hubstaff'
+        else:
+            clocked_min = int(db_rows['Clocked_min'].sum())
+            hours_source = 'inflow'
 
         gr = round(ppv_sent / total_msgs * 100, 2) if total_msgs > 0 else 0
         ur = round(ppv_unlocked / ppv_sent * 100, 2) if ppv_sent > 0 else 0
@@ -881,6 +904,7 @@ def main():
             'models_count': len(chatter_models),
             'clocked_minutes': clocked_min,
             'clocked_hours_formatted': '%dh %dm' % (clocked_min // 60, clocked_min % 60) if clocked_min > 0 else 'N/A',
+            'hours_source': hours_source,
             'sales_per_hour': sales_per_hour,
             'msgs_per_hour': msgs_per_hour,
             'avg_earn_per_spender': avg_earn_per_spender,
